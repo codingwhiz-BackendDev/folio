@@ -4,6 +4,7 @@ import useSWR from 'swr'
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { BookOpen, ChevronLeft, ChevronRight, Feather, ImagePlus, Loader2, LogIn, LogOut, Menu, MoreHorizontal, Plus, Search, Share2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 type Notebook = { id: string; title: string; subtitle: string | null; author_name: string; cover_url: string | null; status: 'draft' | 'published'; owner_id: string | null; updated_at: string }
 type Page = { id: string; notebook_id: string; page_number: number; title: string | null; content: string; image_url: string | null; owner_id: string | null }
@@ -31,7 +32,7 @@ export default function Home() {
   const [form, setForm] = useState({ title: '', subtitle: '', author: '' })
   const activeNotebook = useMemo(() => notebooks?.find((book) => book.id === (activeId ?? notebooks?.[0]?.id)), [activeId, notebooks])
 
-  useEffect(() => { let mounted = true; supabase().auth.getUser().then(async ({ data }) => { if (!mounted || !data.user) return; setUser({ id: data.user.id }); const { data: p } = await supabase().from('profiles').select('id,username').eq('id', data.user.id).maybeSingle(); if (p) setProfile(p as Profile) }); const { data: listener } = supabase().auth.onAuthStateChange((_event, session) => { setUser(session?.user ? { id: session.user.id } : null); if (!session) { setProfile(null); } }); return () => { mounted = false; listener.subscription.unsubscribe() } }, [])
+  useEffect(() => { let mounted = true; supabase().auth.getUser().then(async ({ data }: { data: { user: { id: string } | null } }) => { if (!mounted || !data.user) return; setUser({ id: data.user.id }); const { data: p } = await supabase().from('profiles').select('id,username').eq('id', data.user.id).maybeSingle(); if (p) setProfile(p as Profile) }); const { data: listener } = supabase().auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => { setUser(session?.user ? { id: session.user.id } : null); if (!session) { setProfile(null); } }); return () => { mounted = false; listener.subscription.unsubscribe() } }, [])
 
   const requireAuth = () => { if (!user) { setAuthMode('login'); setShowAuth(true); return false } return true }
   const selectCover = (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setCoverPreview(String(reader.result)); reader.readAsDataURL(file) }
@@ -55,18 +56,21 @@ function NewStoryDialog({ onClose, onSubmit, form, setForm, coverPreview, select
 function Editor({ notebook, ownerId, onClose, onSaved }: { notebook: Notebook; ownerId: string; onClose: () => void; onSaved: () => void }) { const { data: pages, mutate } = useSWR(`edit-pages-${notebook.id}`, async () => { const { data } = await supabase().from('notebook_pages').select('id,notebook_id,page_number,title,content,image_url,owner_id').eq('notebook_id', notebook.id).order('page_number'); return (data ?? []) as Page[] }); const [selected, setSelected] = useState(0); const [saving, setSaving] = useState(false); const page = pages?.[selected]; const savePage = async () => { if (!page) return; setSaving(true); await supabase().from('notebook_pages').update({ title: page.title, content: page.content, image_url: page.image_url }).eq('id', page.id).eq('owner_id', ownerId); await mutate(); onSaved(); setSaving(false) }; const addPage = async () => { const next = (pages?.length ?? 0) + 1; await supabase().from('notebook_pages').insert({ notebook_id: notebook.id, page_number: next, title: `Page ${next}`, content: '', owner_id: ownerId }); mutate() }; return <div className="fixed inset-0 z-40 overflow-y-auto bg-[#f4f1eb] p-5 md:p-10"><div className="mx-auto max-w-5xl"><div className="mb-8 flex items-center justify-between"><div><p className="text-[11px] uppercase tracking-[0.2em] text-[#9b604d]">Writing studio</p><h2 className="mt-2 font-serif text-4xl">{notebook.title}</h2></div><button onClick={onClose} aria-label="Close editor"><X size={22} /></button></div><div className="grid gap-6 md:grid-cols-[180px_1fr]"><aside className="flex gap-2 overflow-x-auto md:flex-col">{pages?.map((item, index) => <button key={item.id} onClick={() => setSelected(index)} className={`rounded-xl border p-3 text-left text-sm ${index === selected ? 'border-[#9b604d] bg-[#fffdf8]' : 'border-[#dedbd3]'}`}>Page {item.page_number}<span className="mt-1 block truncate text-xs text-[#777970]">{item.title || 'Untitled'}</span></button>)}<button onClick={addPage} className="flex items-center gap-2 rounded-xl border border-dashed border-[#c8c4ba] p-3 text-left text-sm text-[#9b604d]"><Plus size={15} /> Add page</button></aside><section className="rounded-[2rem] bg-[#fffdf8] p-6 md:p-10">{page ? <><input value={page.title ?? ''} onChange={(e) => mutate(pages?.map((item, index) => index === selected ? { ...item, title: e.target.value } : item), false)} placeholder="Page title" className="w-full border-b border-[#dedbd3] bg-transparent pb-3 font-serif text-3xl outline-none" /><textarea value={page.content} onChange={(e) => mutate(pages?.map((item, index) => index === selected ? { ...item, content: e.target.value } : item), false)} placeholder="Start writing here..." className="mt-8 min-h-[360px] w-full resize-none bg-transparent font-serif text-lg leading-8 outline-none" /><div className="flex items-center justify-between border-t border-[#dedbd3] pt-5"><span className="text-xs text-[#777970]">Your work is saved to your private studio.</span><button onClick={savePage} disabled={saving} className="rounded-full bg-[#9b604d] px-5 py-3 text-sm font-medium text-white">{saving ? 'Saving…' : 'Save page'}</button></div></> : <p className="text-[#777970]">Add your first page to begin.</p>}</section></div></div></div> }
 
 const splitIntoReaderPages = (content: string) => {
-  const paragraphs = content.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean)
+  const words = content.match(/\S+(?:\s+|$)/g) ?? ['']
   const chunks: string[] = []
   let current = ''
-  for (const paragraph of paragraphs.length ? paragraphs : ['']) {
-    if ((current + (current ? '\n\n' : '') + paragraph).length > 1250 && current) {
-      chunks.push(current)
-      current = paragraph
+  const maxCharacters = 720
+
+  for (const word of words) {
+    if (current && current.length + word.length > maxCharacters) {
+      chunks.push(current.trim())
+      current = word
     } else {
-      current += (current ? '\n\n' : '') + paragraph
+      current += word
     }
   }
-  if (current || !chunks.length) chunks.push(current)
+
+  if (current.trim() || !chunks.length) chunks.push(current.trim())
   return chunks
 }
 
