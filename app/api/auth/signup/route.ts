@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+const getAdmin = () => createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
 export async function POST(request: Request) {
   try {
+    const admin = getAdmin()
     const { username, password } = await request.json()
     if (!/^[a-z0-9_]{3,24}$/.test(username) || typeof password !== 'string' || password.length < 6) {
       return NextResponse.json({ error: 'Invalid account details.' }, { status: 400 })
