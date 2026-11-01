@@ -75,3 +75,31 @@
 .folio-icon-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; background: rgba(255,255,255,.06); color: rgba(246,242,233,.8); }
 .folio-icon-button:hover:not(:disabled) { border-color: rgba(213,162,141,.75); background: rgba(213,162,141,.16); color: #fff; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+/* Editorial studio redesign */
+.folio-dashboard { position: relative; }
+.folio-hero { position: relative; min-height: 18rem; padding: 2.25rem; border: 1px solid rgba(31, 74, 78, .12); border-radius: 2.5rem; overflow: hidden; background: linear-gradient(120deg, rgba(255,253,248,.86), rgba(239,232,220,.62)); box-shadow: 0 20px 80px rgba(31, 74, 78, .08); }
+.folio-hero::after { position: absolute; right: -5rem; bottom: -9rem; width: 24rem; height: 24rem; border: 1px solid rgba(166,95,74,.2); border-radius: 50%; content: ''; box-shadow: 0 0 0 2rem rgba(166,95,74,.035), 0 0 0 5rem rgba(166,95,74,.025); }
+.folio-hero h1 { position: relative; z-index: 1; max-width: 46rem; font-size: clamp(3.5rem, 9vw, 8.5rem); line-height: .82; }
+.folio-hero > button { position: relative; z-index: 2; box-shadow: 0 12px 24px rgba(166,95,74,.25); }
+.folio-content-grid { position: relative; z-index: 2; margin-top: -2rem; }
+.folio-book-stage { min-height: 32rem; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 30px 80px rgba(23,46,51,.24); }
+.folio-book-stage::before { position: absolute; right: 12%; top: 22%; width: 18rem; height: 18rem; border: 1px solid rgba(213,162,141,.35); border-radius: 50%; content: ''; animation: folio-drift 12s ease-in-out infinite; }
+.folio-book-stage h2 { font-size: clamp(3.2rem, 8vw, 6.5rem); }
+.folio-library-panel { box-shadow: 0 20px 60px rgba(31,74,78,.08); }
+.folio-library-panel > div:first-child { border-bottom: 1px solid rgba(31,74,78,.1); padding-bottom: 1.25rem; }
+.folio-library-panel button { border: 1px solid transparent; }
+.folio-library-panel button:hover { border-color: rgba(166,95,74,.25); transform: translateX(4px) !important; }
+.folio-dashboard > #discover { margin-top: 4rem; }
+.folio-dashboard #discover h2 { font-size: clamp(2.5rem, 6vw, 5rem); }
+.folio-editor > div { animation: folio-rise 650ms cubic-bezier(.22, 1, .36, 1) both; }
+.folio-editor section { box-shadow: 0 24px 70px rgba(31,74,78,.09); border: 1px solid rgba(31,74,78,.08); }
+.folio-editor aside button { min-height: 4rem; backdrop-filter: blur(10px); }
+.folio-reader > div { animation: folio-rise 700ms cubic-bezier(.22, 1, .36, 1) both; }
+.folio-reader h2 { text-shadow: 0 12px 40px rgba(0,0,0,.2); }
+@media (max-width: 640px) {
+  .folio-hero { min-height: 21rem; padding: 1.5rem; border-radius: 1.75rem; }
+  .folio-content-grid { margin-top: -1rem; }
+  .folio-book-stage { min-height: 30rem; padding: 1.5rem; }
+  .folio-book-stage::before { right: -5rem; top: 18%; }
+}
