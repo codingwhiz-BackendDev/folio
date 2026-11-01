@@ -59,18 +59,22 @@ const splitIntoReaderPages = (content: string) => {
   const sentences = content.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? ['']
   const chunks: string[] = []
   let current = ''
-  const maxCharacters = typeof window !== 'undefined' && window.innerWidth < 640 ? 260 : 680
+  const maxCharacters = typeof window !== 'undefined' && window.innerWidth < 640 ? 180 : 460
 
-  for (const sentence of sentences) {
-    const candidate = `${current}${current ? ' ' : ''}${sentence}`
-    if (current && candidate.length > maxCharacters) {
-      chunks.push(current.trim())
-      current = sentence
-    } else {
-      current = candidate
+  const addSentence = (sentence: string) => {
+    if (sentence.length <= maxCharacters) {
+      const candidate = `${current}${current ? ' ' : ''}${sentence}`
+      if (current && candidate.length > maxCharacters) { chunks.push(current.trim()); current = sentence } else current = candidate
+      return
+    }
+    const words = sentence.split(/\s+/)
+    for (const word of words) {
+      const candidate = `${current}${current ? ' ' : ''}${word}`
+      if (current && candidate.length > maxCharacters) { chunks.push(current.trim()); current = word } else current = candidate
     }
   }
 
+  sentences.forEach(addSentence)
   if (current.trim() || !chunks.length) chunks.push(current.trim())
   return chunks
 }
