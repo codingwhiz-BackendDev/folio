@@ -2,7 +2,7 @@
 
 import useSWR from 'swr'
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
-import { BookOpen, ChevronLeft, ChevronRight, Feather, ImagePlus, Loader2, LogIn, LogOut, Menu, MoreHorizontal, Plus, Search, Share2, X } from 'lucide-react'
+import { BookOpen, Camera, ChevronLeft, ChevronRight, Feather, ImagePlus, Loader2, LogIn, LogOut, Menu, MoreHorizontal, Plus, Search, Share2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
@@ -59,7 +59,7 @@ const splitIntoReaderPages = (content: string) => {
   const words = content.match(/\S+(?:\s+|$)/g) ?? ['']
   const chunks: string[] = []
   let current = ''
-  const maxCharacters = 720
+  const maxCharacters = typeof window !== 'undefined' && window.innerWidth < 640 ? 260 : 680
 
   for (const word of words) {
     if (current && current.length + word.length > maxCharacters) {
@@ -74,4 +74,46 @@ const splitIntoReaderPages = (content: string) => {
   return chunks
 }
 
-function Reader({ notebook, onClose }: { notebook: Notebook; onClose: () => void }) { const { data: pages } = useSWR(`pages-${notebook.id}`, async () => { const { data } = await supabase().from('notebook_pages').select('id,notebook_id,page_number,title,content,image_url,owner_id').eq('notebook_id', notebook.id).order('page_number'); return (data ?? []) as Page[] }); const virtualPages = useMemo(() => (pages ?? []).flatMap((source) => splitIntoReaderPages(source.content).map((content, index) => ({ ...source, content, page_number: source.page_number + index / 100 }))), [pages]); const [pageIndex, setPageIndex] = useState(0); const [touchStart, setTouchStart] = useState<number | null>(null); const page = virtualPages[pageIndex]; const goToPage = (next: number) => setPageIndex(Math.max(0, Math.min(next, virtualPages.length - 1))); useEffect(() => { const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'ArrowRight' || event.key === 'ArrowDown') goToPage(pageIndex + 1); if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') goToPage(pageIndex - 1) }; window.addEventListener('keydown', onKeyDown); return () => window.removeEventListener('keydown', onKeyDown) }, [pageIndex, virtualPages.length]); const sharePage = async () => { const shareText = `${notebook.title}${page?.title ? ` — ${page.title}` : ''}`; if (navigator.share) await navigator.share({ title: shareText, text: page?.content || 'Read this beautiful story on folio.', url: window.location.href }); else { await navigator.clipboard.writeText(`${shareText}\n\n${page?.content || ''}`); window.alert('Passage copied. You can now paste it anywhere.'); } }; return <div onTouchStart={(event) => setTouchStart(event.changedTouches[0]?.clientX ?? null)} onTouchEnd={(event) => { if (touchStart === null) return; const distance = (event.changedTouches[0]?.clientX ?? touchStart) - touchStart; if (Math.abs(distance) > 48) goToPage(pageIndex + (distance < 0 ? 1 : -1)); setTouchStart(null) }} className="folio-reader fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#172e33] p-4 text-[#f6f2e9] md:p-8"><div className="mx-auto flex h-full max-w-5xl flex-col"><div className="flex items-center justify-between"><button onClick={onClose} className="flex items-center gap-2 text-sm text-white/60"><X size={18} /> Close reader</button><span className="font-serif text-lg">folio</span><span className="text-xs text-white/50">{page ? String(page.page_number).padStart(2, '0') : '—'} / {virtualPages.length || '…'}</span></div><div className="min-h-0 flex-1 overflow-y-auto py-6"><div className="flex min-h-full items-center justify-center"><div className="grid max-w-3xl gap-10 md:grid-cols-2 md:gap-20"><div className="border-l border-white/20 pl-6 md:pl-10"><p className="mb-12 text-[10px] uppercase tracking-[0.24em] text-[#d5a28d]">{notebook.author_name}</p><h2 className="font-serif text-5xl leading-[0.95] tracking-[-0.05em]">{notebook.title}</h2>{page?.title && <p className="mt-5 text-sm uppercase tracking-[0.2em] text-[#d5a28d]">{page.title}</p>}</div><div className="max-w-md self-end font-serif text-lg leading-8 text-white/75">{page?.content ? page.content.split('\n').map((paragraph, index) => <p key={`${paragraph}-${index}`} className="mt-6 first:mt-0">{paragraph}</p>) : <p className="text-white/45">This page is waiting for its first words.</p>}</div></div></div></div><div className="folio-reader-nav -mx-4 flex items-center justify-between border-t border-white/15 px-4 pb-1 pt-5 md:-mx-8 md:px-8"><button onClick={sharePage} className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs text-white/70 transition hover:border-white/40 hover:text-white"><Share2 size={14} /> Share page</button><div className="flex items-center gap-5"><button onClick={() => setPageIndex((index) => Math.max(index - 1, 0))} disabled={pageIndex === 0} aria-label="Previous page" title="Previous page" className="folio-icon-button disabled:opacity-30"><ChevronLeft size={18} /></button><span className="text-xs text-white/40">Turn the page</span><button onClick={() => setPageIndex((index) => Math.min(index + 1, (pages?.length ?? 1) - 1))} disabled={!pages || pageIndex >= pages.length - 1} aria-label="Next page" title="Next page" className="folio-icon-button disabled:opacity-30"><ChevronRight size={18} /></button></div></div></div></div> }
+const createShareCard = async (notebook: Notebook, page: Page | undefined) => {
+  if (!page) return
+  const canvas = document.createElement('canvas')
+  canvas.width = 1080
+  canvas.height = 1350
+  const context = canvas.getContext('2d')
+  if (!context) return
+  const gradient = context.createLinearGradient(0, 0, 1080, 1350)
+  gradient.addColorStop(0, '#17383b')
+  gradient.addColorStop(1, '#0b2025')
+  context.fillStyle = gradient
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.fillStyle = '#d9a18b'
+  context.fillRect(72, 112, 84, 6)
+  context.fillStyle = '#f6f2e9'
+  context.font = '600 30px Arial'
+    context.fillText('FOLIO', 72, 86)
+  context.font = 'italic 72px Georgia'
+  context.fillText(notebook.title.slice(0, 28), 72, 280)
+  context.font = '600 24px Arial'
+  context.fillStyle = '#d9a18b'
+  context.fillText((page.title || `Page ${page.page_number}`).toUpperCase().slice(0, 42), 72, 350)
+  context.font = '38px Georgia'
+  context.fillStyle = '#f6f2e9'
+  const words = page.content.trim().split(/\s+/)
+  let line = ''
+  let y = 470
+  for (const word of words) {
+    const next = `${line} ${word}`.trim()
+    if (context.measureText(next).width > 900 && line) { context.fillText(line, 72, y); line = word; y += 58; if (y > 1080) break } else line = next
+  }
+  if (line && y <= 1080) context.fillText(line, 72, y)
+  context.fillStyle = 'rgba(246,242,233,.55)'
+  context.font = '24px Arial'
+  context.fillText(`— ${notebook.author_name}`, 72, 1220)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (!blob) return
+  const file = new File([blob], 'folio-share-card.png', { type: 'image/png' })
+  if (navigator.share && navigator.canShare?.({ files: [file] })) await navigator.share({ title: notebook.title, files: [file] })
+  else { const link = document.createElement('a'); link.download = file.name; link.href = URL.createObjectURL(blob); link.click(); URL.revokeObjectURL(link.href) }
+}
+
+function Reader({ notebook, onClose }: { notebook: Notebook; onClose: () => void }) { const { data: pages } = useSWR(`pages-${notebook.id}`, async () => { const { data } = await supabase().from('notebook_pages').select('id,notebook_id,page_number,title,content,image_url,owner_id').eq('notebook_id', notebook.id).order('page_number'); return (data ?? []) as Page[] }); const virtualPages = useMemo(() => (pages ?? []).flatMap((source) => splitIntoReaderPages(source.content).map((content, index) => ({ ...source, content, page_number: source.page_number + index / 100 }))), [pages]); const [pageIndex, setPageIndex] = useState(0); const [touchStart, setTouchStart] = useState<number | null>(null); const page = virtualPages[pageIndex]; const goToPage = (next: number) => setPageIndex(Math.max(0, Math.min(next, virtualPages.length - 1))); useEffect(() => { const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'ArrowRight' || event.key === 'ArrowDown') goToPage(pageIndex + 1); if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') goToPage(pageIndex - 1) }; window.addEventListener('keydown', onKeyDown); return () => window.removeEventListener('keydown', onKeyDown) }, [pageIndex, virtualPages.length]); const sharePage = async () => { const shareText = `${notebook.title}${page?.title ? ` — ${page.title}` : ''}`; if (navigator.share) await navigator.share({ title: shareText, text: page?.content || 'Read this beautiful story on folio.', url: window.location.href }); else { await navigator.clipboard.writeText(`${shareText}\n\n${page?.content || ''}`); window.alert('Passage copied. You can now paste it anywhere.'); } }; return <div onTouchStart={(event) => setTouchStart(event.changedTouches[0]?.clientX ?? null)} onTouchEnd={(event) => { if (touchStart === null) return; const distance = (event.changedTouches[0]?.clientX ?? touchStart) - touchStart; if (Math.abs(distance) > 48) goToPage(pageIndex + (distance < 0 ? 1 : -1)); setTouchStart(null) }} className="folio-reader fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#172e33] p-4 text-[#f6f2e9] md:p-8"><div className="mx-auto flex h-full max-w-5xl flex-col"><div className="flex items-center justify-between"><button onClick={onClose} className="flex items-center gap-2 text-sm text-white/60"><X size={18} /> Close reader</button><span className="font-serif text-lg">folio</span><span className="text-xs text-white/50">{page ? String(page.page_number).padStart(2, '0') : '—'} / {virtualPages.length || '…'}</span></div><div className="folio-reader-page min-h-0 flex-1 overflow-hidden py-4"><div className="flex min-h-full items-center justify-center"><div className="grid max-w-3xl gap-10 md:grid-cols-2 md:gap-20"><div className="border-l border-white/20 pl-6 md:pl-10"><p className="mb-12 text-[10px] uppercase tracking-[0.24em] text-[#d5a28d]">{notebook.author_name}</p><h2 className="font-serif text-5xl leading-[0.95] tracking-[-0.05em]">{notebook.title}</h2>{page?.title && <p className="mt-5 text-sm uppercase tracking-[0.2em] text-[#d5a28d]">{page.title}</p>}</div><div className="max-w-md self-end font-serif text-lg leading-8 text-white/75">{page?.content ? page.content.split('\n').map((paragraph, index) => <p key={`${paragraph}-${index}`} className="mt-6 first:mt-0">{paragraph}</p>) : <p className="text-white/45">This page is waiting for its first words.</p>}</div></div></div></div><div className="folio-reader-nav -mx-4 flex items-center justify-between border-t border-white/15 px-4 pb-1 pt-5 md:-mx-8 md:px-8"><div className="flex items-center gap-2"><button onClick={() => createShareCard(notebook, page)} aria-label="Create screenshot share card" title="Create screenshot share card" className="folio-icon-button"><Camera size={17} /></button><button onClick={sharePage} aria-label="Share page" title="Share page" className="folio-icon-button"><Share2 size={17} /></button></div><div className="flex items-center gap-5"><button onClick={() => setPageIndex((index) => Math.max(index - 1, 0))} disabled={pageIndex === 0} aria-label="Previous page" title="Previous page" className="folio-icon-button disabled:opacity-30"><ChevronLeft size={18} /></button><span className="text-xs text-white/40">Turn the page</span><button onClick={() => setPageIndex((index) => Math.min(index + 1, (pages?.length ?? 1) - 1))} disabled={!pages || pageIndex >= pages.length - 1} aria-label="Next page" title="Next page" className="folio-icon-button disabled:opacity-30"><ChevronRight size={18} /></button></div></div></div></div> }

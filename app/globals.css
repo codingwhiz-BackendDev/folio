@@ -97,6 +97,12 @@
 .folio-editor aside button { min-height: 4rem; backdrop-filter: blur(10px); }
 .folio-reader > div { animation: folio-rise 700ms cubic-bezier(.22, 1, .36, 1) both; }
 .folio-reader h2 { text-shadow: 0 12px 40px rgba(0,0,0,.2); }
+.folio-reader-page { touch-action: pan-y; }
+.folio-reader-page > div { min-height: 0; height: 100%; }
+.folio-reader-page > div > div { max-height: 100%; }
+.folio-reader-page .font-serif { font-size: clamp(1rem, 2.2vw, 1.25rem); line-height: 1.7; }
+.folio-reader-page h2 { font-size: clamp(2.5rem, 8vw, 5rem); }
+@media (max-width: 640px) { .folio-reader-page { padding-top: .25rem; padding-bottom: .25rem; } .folio-reader-page .font-serif { font-size: 1rem; line-height: 1.55; } .folio-reader-page h2 { font-size: 2.6rem; } }
 @media (max-width: 640px) {
   .folio-hero { min-height: 21rem; padding: 1.5rem; border-radius: 1.75rem; }
   .folio-content-grid { margin-top: -1rem; }
